@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+	<meta name="description" content="Avoiding Callback Hell">
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width">
+	<title>Weather App</title>
+	<link rel="stylesheet" href="style.css">
+	<script>
+		/**************************************************/
+		/**************************************************/
+		; (() => {
+
+			/* KEYS */
+			const key = "166a433c57516f51dfab1f7edaed8413";
+
+			/* SETTINGS */
+			const outputSelector = "main"; //this is the querySelector text to get output HTML element
+			const customButtonsSelector = "nav footer"; //this contains all user-defined city buttons
+			const errorSelector = "header p"; //
+			const tempDecimalPlaces = 2; //
+
+			/* STYLING */
+			const styles = [
+				`${errorSelector} { color: red; }`
+			];
+
+			/* STYLING */
+
+
+
+			document.addEventListener("DOMContentLoaded", init);
+
+			//load array of buttons stored in memory
+			function init() {
+				loadStyles(styles);
+				document.querySelector("header input[type='button']").addEventListener("click", handleCustomCityClick);
+			}
+
+			function loadStyles(styles) {
+				let stylesheet = (function () {
+					let styleElement = window.document.createElement("style");
+					window.document.head.appendChild(styleElement);
+					return styleElement.sheet;
+				})();
+				//add styles to the stylesheet
+				for (let rule of styles) {
+					stylesheet.insertRule(rule, stylesheet.cssRules.length);
+				}
+			}
+
+			async function getLatLngByCity(cityName) {
+				let lat, lng, city;
+				let url = `http://api.openweathermap.org/data/2.5/weather?q=${cityName}&appid=${key}`;
+				await fetch(url).then(res => res.json()).then(json => {
+					console.log(json);
+					lat = json.coord ? json.coord.lat : null;
+					lng = json.coord ? json.coord.lon : null;
+					city = json.name ? json.name : null;
+				});
+				return { lat, lng, city };
+			}
+
+			async function getWeatherByLatLng(lat, lng) {
+				let data;
+				let url = `http://api.openweathermap.org/data/2.5/onecall?lat=${lat}&lon=${lng}&appid=${key}`;
+				await fetch(url).then(res => res.json()).then(json => {
+					data = json;
+				});
+				return data;
+			}
+
+			async function handleCustomCityClick(e) {
+				let cityName = document.querySelector("header input").value.trim();
+				if (!cityName) return;
+				let { lat, lng, city } = await getLatLngByCity(cityName);
+				//error?
+				if (!lat || !lng || !city) return displayError("City not found; please check your spelling.");
+				//no errors
+				clearErrors();
+				addCustomCity(lat, lng, city);
+				let data = await getWeatherByLatLng(lat, lng);
+				displayWeather(data, city);
+			}
+
+			function addCustomCity(lat, lng, city) {
+				//when we deal with localStorage, make sure it's not a duplicate
+				let isDupe = document.querySelector(customButtonsSelector).textContent.includes(city);
+				if (isDupe) return;
+				let html = `<button data-lat="${lat}" data-lng="${lng}">${city}</button>`;
+				let buttonContainer = document.querySelector(customButtonsSelector);
+				buttonContainer.innerHTML += html;
+				buttonContainer.querySelectorAll("button").forEach(button => button.addEventListener("click", handleSavedCityClick));
+			}
+
+			async function handleSavedCityClick(e) {
+				let button = e.target;
+				let lat = button.getAttribute("data-lat");
+				let lng = button.getAttribute("data-lng");
+				let city = button.textContent;
+				let data = await getWeatherByLatLng(lat, lng);
+				displayWeather(data, city);
+			}
+
+			function displayWeather(data, city) {
+				document.querySelector(outputSelector).innerHTML = `
+		<article>
+            <h2>Current Weather for ${city}</h2>
+		
+			<h3>
+			Today's date is ${utcConWeekday(data.current.dt)}, ${utcConMonth(data.current.dt)} ${utcConDay(data.current.dt)}, ${utcConYear(data.current.dt)}
+			</h3>
+
+            <h3>${data.current.weather[0].description}</h3>
+			<aside>
+                <p>Temp: ${kelvinToFahrenheit(data.current.temp).toFixed(tempDecimalPlaces)}&#176;F</p>
+                <p>Feels Like: ${kelvinToFahrenheit(data.current.feels_like).toFixed(tempDecimalPlaces)}&#176;F</p>
+                <p>Humidity: ${data.current.humidity}%</p>
+                <p>Dew Point: ${data.current.dew_point}</p>
+                <p>UVI Index: ${data.current.uvi} out of 10</p>
+                <p>Clouds: ${data.current.clouds}%</p>
+			</aside>
+		</article>
+		${getForecast(data)}
+	`;
+			}
+
+			function getForecast(data) {
+				let html = "";
+				for (let day of data.daily) {
+					html += `
+			<hr />
+			<section>
+				<p>${day.weather[0].description}</p>
+      			<p>Min Temp: ${kelvinToFahrenheit(day.temp.min).toFixed(tempDecimalPlaces)}&#176;F</p>
+				<p>Min Temp: ${kelvinToFahrenheit(day.temp.max).toFixed(tempDecimalPlaces)}&#176;F</p>
+				<p>${utcConWeekday(data.current.dt)}</P
+      		</section>
+		`;
+				}
+				return html;
+			}
+
+			function displayError(msg) {
+				document.querySelector(errorSelector).textContent = msg;
+			}
+
+			function clearErrors() {
+				document.querySelector(errorSelector).textContent = "";
+			}
+
+			/* helper functions */
+
+			function kelvinToFahrenheit(K) {
+				return (K - 273.15) * 9 / 5 + 32;
+			}
+
+			function kelvinToCelcius(K) {
+				return K - 273.15;
+			}
+
+			function utcConWeekday(dayOfWeek) {
+				return new Date(dayOfWeek * 1000).toLocaleString("en-US", { weekday: "long" });
+			}
+			function utcConMonth(month) {
+				return new Date(month * 1000).toLocaleString("en-US", { month: "long" });
+			}
+			function utcConDay(day) {
+				return new Date(day * 1000).toLocaleString("en-US", { day: "numeric" });
+			}
+			function utcConYear(year) {
+				return new Date(year * 1000).toLocaleString("en-US", { year: "numeric" });
+			}
+			function utcConHour(hour) {
+				return new Date(hour * 1000).toLocaleString("en-US", { hour: "numeric" });
+			}
+			function utcConMinute(minute) {
+				return new Date(minute * 1000).toLocaleString("en-US", { minute: "numeric" });
+			}
+			function utcConSecond(second) {
+				return new Date(second * 1000).toLocaleString("en-US", { second: "numeric" });
+			}
+			function utcConHumTime(stamp) {
+				return new Date(stamp * 1000).toLocaleString("en-US", { timeZoneName: "short" });
+			}
+
+		})();
+/**************************************************/
+		/**************************************************/
+	</script>
+</head>
+
+<body>
+	<header>
+		<h1>Big Kahuna Systems</h1>
+		<nav>
+			<input placeholder="city" /><input type="button" value="Get Weather" />
+			<p></p>
+			<footer></footer>
+		</nav>
+	</header>
+	<main></main>
+</body>
+
+</html>
