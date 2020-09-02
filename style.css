@@ -19,11 +19,14 @@ header {
 
   section {
     background-color: greenyellow;
-    padding: 30px;
+    padding: 10px;
     text-align: center;
     font-size: 20px;
-    float: left;
-    width: 12.5%; float: left;
+    border: 2px solid cyan;
+    border-radius: 25px;
+    border-spacing: 5px;
+    border-collapse: separate;
+    display: flex;
   }
 
 article {
@@ -33,6 +36,14 @@ article {
     font-size: 35px;
     color: white;
 }
+
+forecastContainer {
+  width: 100%;
+  height: 300px;
+  display: flex;
+  flex-direction: row-reverse;
+}
+
 
 nav  {
 
